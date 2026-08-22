@@ -1,4 +1,8 @@
 use macroquad::prelude::*;
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::{Duration, Instant};
+use sysinfo::{ProcessesToUpdate, System, get_current_pid};
 
 struct Particle {
     pos: Vec2,
@@ -22,12 +26,24 @@ const N: usize = 10_000;
 
 #[macroquad::main(window_conf)]
 async fn main() {
+    let metrics = spawn_metrics_monitor();
+
     let mut particles = create_particles(N);
 
     loop {
         input();
+
+        let t0 = Instant::now();
         update(&mut particles);
+        let update_ms = t0.elapsed().as_secs_f64() * 1000.0;
+
+        let t1 = Instant::now();
         render(&particles);
+        let render_ms = t1.elapsed().as_secs_f64() * 1000.0;
+
+        // draw_metrics is deliberately outside both timers above,
+        // so its own cost isn't counted as update/render time
+        draw_metrics(&metrics, update_ms, render_ms);
 
         next_frame().await
     }
@@ -50,8 +66,6 @@ fn render(particles: &Vec<Particle>) {
     for p in particles.iter() {
         draw_particle(p);
     }
-
-    draw_metrics();
 }
 
 // -- Update functions
@@ -75,19 +89,31 @@ fn draw_particle(p: &Particle) {
     draw_circle(p.pos.x, p.pos.y, p.radius, p.color);
 }
 
-fn draw_metrics() {
-    draw_text(
-        &format!(
-            "fps: {:.2}, frame_time: {:.4}s, particles: {}",
+fn draw_metrics(metrics: &Arc<Mutex<Metrics>>, update_ms: f64, render_ms: f64) {
+    let m = *metrics.lock().unwrap();
+
+    let lines = [
+        format!(
+            "fps: {:.2}  particles: {}  frame_time: {:.4}s",
             macroquad::time::get_fps(),
-            macroquad::time::get_frame_time(),
-            N
+            N,
+            macroquad::time::get_frame_time()
         ),
-        20.0,
-        30.0,
-        30.0,
-        YELLOW,
+        format!("update: {:.3}ms  render: {:.3}ms", update_ms, render_ms),
+        format!("cpu: {:.1}%  mem: {:.1}MB", m.cpu_pct, m.mem_mb),
+    ];
+
+    draw_rectangle(
+        10.0,
+        10.0,
+        635.0,
+        lines.len() as f32 * 25.0 + 15.0,
+        Color::new(0.0, 0.0, 0.0, 0.6),
     );
+
+    for (i, line) in lines.iter().enumerate() {
+        draw_text(line, 20.0, 30.0 + i as f32 * 25.0, 30.0, YELLOW);
+    }
 }
 
 // -- Helper functions
@@ -133,6 +159,43 @@ fn get_random_color() -> Color {
         rand::gen_range(low, high),
         alpha,
     )
+}
+
+// -- Metrics
+
+#[derive(Clone, Copy, Default)]
+struct Metrics {
+    cpu_pct: f32,
+    mem_mb: f32,
+}
+
+fn spawn_metrics_monitor() -> Arc<Mutex<Metrics>> {
+    let shared = Arc::new(Mutex::new(Metrics::default()));
+    let shared_clone = shared.clone();
+
+    thread::spawn(move || {
+        let pid = get_current_pid().expect("failed to get current pid");
+
+        let mut sys = System::new();
+        sys.refresh_processes(ProcessesToUpdate::Some(&[pid]), true);
+
+        thread::sleep(Duration::from_millis(200));
+
+        loop {
+            sys.refresh_processes(ProcessesToUpdate::Some(&[pid]), true);
+
+            if let Some(process) = sys.process(pid) {
+                *shared_clone.lock().unwrap() = Metrics {
+                    cpu_pct: process.cpu_usage(),
+                    mem_mb: process.memory() as f32 / 1024.0 / 1024.0,
+                };
+            }
+
+            thread::sleep(Duration::from_millis(500)); // 1/2 second
+        }
+    });
+
+    shared
 }
 
 // -- Window configuration
