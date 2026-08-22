@@ -22,7 +22,7 @@ impl Particle {
     }
 }
 
-const N: usize = 10_000;
+const N: usize = 2_000;
 
 #[macroquad::main(window_conf)]
 async fn main() {
@@ -54,10 +54,14 @@ async fn main() {
 fn input() {}
 
 fn update(particles: &mut Vec<Particle>) {
-    // O(n) update of all particles
+    // O(n^2) particle collision detection
+
     for p in particles.iter_mut() {
         update_particle(p);
     }
+
+    // Collisions
+    update_particles(particles);
 }
 
 fn render(particles: &Vec<Particle>) {
@@ -79,6 +83,28 @@ fn update_particle(p: &mut Particle) {
     }
     if p.pos.y < 0.0 || p.pos.y > screen_height() {
         p.vel.y *= -1.0;
+    }
+}
+
+fn update_particles(particles: &mut Vec<Particle>) {
+    let n = particles.len();
+
+    for i in 0..n {
+        for j in (i + 1)..n {
+            // If the distance between the two particles is less than the sum of their radii, they
+            // are colliding. Imagine two circles. If the distance between their centers is less
+            // than the sum of their radii, they must be overlapping.
+
+            let dist = particles[i].pos.distance(particles[j].pos);
+
+            if dist < particles[i].radius + particles[j].radius {
+                // Swap velocities
+                let v1 = particles[i].vel;
+                let v2 = particles[j].vel;
+                particles[i].vel = v2;
+                particles[j].vel = v1;
+            }
+        }
     }
 }
 
