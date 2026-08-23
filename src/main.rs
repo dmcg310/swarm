@@ -4,7 +4,9 @@ use std::time::Instant;
 use crate::particle_system::ParticleSystem;
 use crate::window::create_window;
 
+mod cell;
 mod common;
+mod grid;
 mod metrics;
 mod particle;
 mod particle_system;
@@ -31,7 +33,7 @@ async fn main() {
         let draw_ms = t1.elapsed().as_secs_f64() * 1000.0;
 
         // draw_metrics is deliberately outside both timers above,
-        // so its own cost isn't counted as update/draw time
+        // so its own cost isn't counted as update/draw time.
         metrics.lock().unwrap().draw(update_ms, draw_ms);
 
         next_frame().await
