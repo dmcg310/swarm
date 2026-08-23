@@ -1,8 +1,12 @@
 use macroquad::prelude::*;
 use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::{Duration, Instant};
-use sysinfo::{ProcessesToUpdate, System, get_current_pid};
+use std::time::Instant;
+
+use crate::window::window_conf;
+
+mod common;
+mod metrics;
+mod window;
 
 struct Particle {
     pos: Vec2,
@@ -26,7 +30,7 @@ const N: usize = 2_000;
 
 #[macroquad::main(window_conf)]
 async fn main() {
-    let metrics = spawn_metrics_monitor();
+    let metrics = metrics::spawn_metrics_monitor();
 
     let mut particles = create_particles(N);
 
@@ -57,7 +61,7 @@ fn input() {
     }
 }
 
-fn update(particles: &mut Vec<Particle>) {
+fn update(particles: &mut [Particle]) {
     // O(n^2) particle collision detection
 
     for p in particles.iter_mut() {
@@ -68,7 +72,7 @@ fn update(particles: &mut Vec<Particle>) {
     update_particles(particles);
 }
 
-fn render(particles: &Vec<Particle>) {
+fn render(particles: &[Particle]) {
     clear_background(DARKGRAY);
 
     for p in particles.iter() {
@@ -90,7 +94,7 @@ fn update_particle(p: &mut Particle) {
     }
 }
 
-fn update_particles(particles: &mut Vec<Particle>) {
+fn update_particles(particles: &mut [Particle]) {
     let n = particles.len();
 
     for i in 0..n {
@@ -119,7 +123,7 @@ fn draw_particle(p: &Particle) {
     draw_circle(p.pos.x, p.pos.y, p.radius, p.color);
 }
 
-fn draw_metrics(metrics: &Arc<Mutex<Metrics>>, update_ms: f64, render_ms: f64) {
+fn draw_metrics(metrics: &Arc<Mutex<metrics::Metrics>>, update_ms: f64, render_ms: f64) {
     let m = *metrics.lock().unwrap();
 
     let lines = [
@@ -130,7 +134,7 @@ fn draw_metrics(metrics: &Arc<Mutex<Metrics>>, update_ms: f64, render_ms: f64) {
             macroquad::time::get_frame_time()
         ),
         format!("update: {:.3}ms  render: {:.3}ms", update_ms, render_ms),
-        format!("cpu: {:.1}%  mem: {:.1}MB", m.cpu_pct, m.mem_mb),
+        format!("cpu: {:.1}%  mem: {:.1}MB", m.cpu_pct(), m.mem_mb()),
     ];
 
     draw_rectangle(
@@ -155,89 +159,12 @@ fn create_particles(n: usize) -> Vec<Particle> {
     let mut particles = Vec::with_capacity(n);
     for _ in 0..n {
         particles.push(Particle::new(
-            get_random_pos(),
-            get_random_vel(),
+            common::get_random_pos(),
+            common::get_random_vel(),
             radius,
-            get_random_color(),
+            common::get_random_color(),
         ));
     }
 
     particles
-}
-
-fn get_random_pos() -> Vec2 {
-    let low = 0.0;
-    vec2(
-        rand::gen_range(low, screen_width()),
-        rand::gen_range(low, screen_height()),
-    )
-}
-
-fn get_random_vel() -> Vec2 {
-    let low = -1.0;
-    let high = 1.0;
-    vec2(rand::gen_range(low, high), rand::gen_range(low, high))
-}
-
-fn get_random_color() -> Color {
-    let low = 0.0;
-    let high = 1.0;
-    let alpha = 1.0;
-    Color::new(
-        rand::gen_range(low, high),
-        rand::gen_range(low, high),
-        rand::gen_range(low, high),
-        alpha,
-    )
-}
-
-// -- Metrics
-
-#[derive(Clone, Copy, Default)]
-struct Metrics {
-    cpu_pct: f32,
-    mem_mb: f32,
-}
-
-fn spawn_metrics_monitor() -> Arc<Mutex<Metrics>> {
-    let shared = Arc::new(Mutex::new(Metrics::default()));
-    let shared_clone = shared.clone();
-
-    thread::spawn(move || {
-        let pid = get_current_pid().expect("failed to get current pid");
-
-        let mut sys = System::new();
-        sys.refresh_processes(ProcessesToUpdate::Some(&[pid]), true);
-
-        thread::sleep(Duration::from_millis(200));
-
-        loop {
-            sys.refresh_processes(ProcessesToUpdate::Some(&[pid]), true);
-
-            if let Some(process) = sys.process(pid) {
-                *shared_clone.lock().unwrap() = Metrics {
-                    cpu_pct: process.cpu_usage(),
-                    mem_mb: process.memory() as f32 / 1024.0 / 1024.0,
-                };
-            }
-
-            thread::sleep(Duration::from_millis(500)); // 1/2 second
-        }
-    });
-
-    shared
-}
-
-// -- Window configuration
-
-fn window_conf() -> Conf {
-    let title = String::from("swarm");
-    let width = 1280;
-    let height = 720;
-    Conf {
-        window_title: title,
-        window_width: width,
-        window_height: height,
-        ..Default::default()
-    }
 }
