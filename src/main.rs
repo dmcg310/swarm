@@ -51,7 +51,11 @@ async fn main() {
 
 // -- Main loop functions
 
-fn input() {}
+fn input() {
+    if is_key_pressed(KeyCode::Q) {
+        std::process::exit(0);
+    }
+}
 
 fn update(particles: &mut Vec<Particle>) {
     // O(n^2) particle collision detection
