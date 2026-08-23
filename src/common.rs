@@ -3,6 +3,7 @@ use macroquad::prelude::*;
 /// Returns a random position within the screen bounds.
 pub fn get_random_pos() -> Vec2 {
     let low = 0.0;
+
     vec2(
         rand::gen_range(low, screen_width()),
         rand::gen_range(low, screen_height()),
@@ -13,6 +14,7 @@ pub fn get_random_pos() -> Vec2 {
 pub fn get_random_vel() -> Vec2 {
     let low = -1.0;
     let high = 1.0;
+
     vec2(rand::gen_range(low, high), rand::gen_range(low, high))
 }
 
@@ -21,6 +23,7 @@ pub fn get_random_color() -> Color {
     let low = 0.0;
     let high = 1.0;
     let alpha = 1.0;
+
     Color::new(
         rand::gen_range(low, high),
         rand::gen_range(low, high),

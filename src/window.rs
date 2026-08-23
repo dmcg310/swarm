@@ -1,14 +1,20 @@
 use macroquad::prelude::Conf;
 
-/// Returns a `Conf` struct with the window configuration for the application.
-pub fn window_conf() -> Conf {
-    let title = String::from("swarm");
-    let width = 1280;
-    let height = 720;
+/// Window title.
+const TITLE: &str = "swarm";
+
+/// Window width.
+const WIDTH: i32 = 1280;
+
+/// Window height.
+const HEIGHT: i32 = 720;
+
+/// Create a window configuration for macroquad.
+pub fn create_window() -> Conf {
     Conf {
-        window_title: title,
-        window_width: width,
-        window_height: height,
+        window_title: TITLE.to_string(),
+        window_width: WIDTH,
+        window_height: HEIGHT,
         ..Default::default()
     }
 }
