@@ -5,7 +5,7 @@ use crate::grid::Grid;
 use crate::particle::Particle;
 
 /// Number of particles to simulate.
-pub const N: usize = 2_000;
+pub const N: usize = 5_000;
 
 /// A particle system is a collection of particles that can be updated and drawn to the screen.
 pub struct ParticleSystem {
