@@ -4,6 +4,8 @@ use std::thread;
 use std::time::Duration;
 use sysinfo::{ProcessesToUpdate, System, get_current_pid};
 
+use crate::frame_time_history::{self, FrameTimeHistory};
+
 /// A struct to hold CPU and memory usage metrics.
 #[derive(Clone, Copy, Default)]
 pub struct Metrics {
@@ -29,37 +31,36 @@ impl Metrics {
     }
 
     /// Draws the metrics on the screen. This includes FPS, number of particles, frame time, update
-    /// time, draw time, CPU usage, and memory usage.
-    pub fn draw(&self, update_ms: f64, draw_ms: f64) {
+    /// time, draw time, CPU usage, memory usage, and a rolling frame-time graph.
+    pub fn draw(&self, update_ms: f64, draw_ms: f64, frame_time_history: &FrameTimeHistory) {
         let lines = [
             format!(
-                "fps: {:.2}  particles: {}  frame_time: {:.4}s",
+                "fps: {:.2}  particles: {}",
                 get_fps(),
                 crate::particle_system::N,
-                get_frame_time()
             ),
             format!("update: {:.3}ms  draw: {:.3}ms", update_ms, draw_ms),
             format!("cpu: {:.1}%  mem: {:.1}MB", self.cpu_pct(), self.mem_mb()),
         ];
 
-        // Draw a semi-transparent black rectangle as the background for the metrics text.
-        draw_rectangle(
-            10.0,
-            10.0,
-            635.0,
-            lines.len() as f32 * 25.0 + 15.0,
-            macroquad::color::Color::new(0.0, 0.0, 0.0, 0.6),
-        );
+        let panel_x = 10.0;
+        let panel_w = 635.0;
+        let text_h = lines.len() as f32 * 25.0 + 15.0;
 
+        draw_rectangle(
+            panel_x,
+            10.0,
+            panel_w,
+            text_h,
+            Color::new(0.0, 0.0, 0.0, 0.6),
+        );
         for (i, line) in lines.iter().enumerate() {
-            draw_text(
-                line,
-                20.0,
-                30.0 + i as f32 * 25.0,
-                30.0,
-                macroquad::color::YELLOW,
-            );
+            draw_text(line, 20.0, 30.0 + i as f32 * 25.0, 30.0, YELLOW);
         }
+
+        let graph_y = 10.0 + text_h + 10.0;
+        let graph_h = 100.0;
+        frame_time_history::draw(frame_time_history, panel_x, graph_y, panel_w, graph_h);
     }
 }
 
