@@ -10,7 +10,7 @@ mod common;
 mod frame_time_history;
 mod grid;
 mod metrics;
-mod particle;
+mod particle_data;
 mod particle_system;
 mod window;
 

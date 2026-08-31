@@ -2,14 +2,16 @@ use std::collections::HashSet;
 
 use crate::common;
 use crate::grid::Grid;
-use crate::particle::Particle;
+use crate::particle_data::ParticleData;
 
 /// Number of particles to simulate.
-pub const N: usize = 5_000;
+pub const N: usize = 2_000;
 
-/// A particle system is a collection of particles that can be updated and drawn to the screen.
+/// A struct that represents a particle system. It contains a collection of particles, a list of
+/// pairs of particles that are colliding, and a spatial hash grid for efficient collision
+/// detection.
 pub struct ParticleSystem {
-    particles: Vec<Particle>,
+    particles: ParticleData,
     pairs: Vec<(usize, usize)>,
     grid: Grid, // spatial hash grid
 }
@@ -20,14 +22,14 @@ impl ParticleSystem {
     pub fn new() -> Self {
         let radius = 2.0;
 
-        let mut particles = Vec::with_capacity(N);
+        let mut particles = ParticleData::new(N);
         for _ in 0..N {
-            particles.push(Particle::new(
+            particles.push(
                 common::get_random_pos(),
                 common::get_random_vel(),
                 radius,
                 common::get_random_color(),
-            ));
+            );
         }
 
         let pairs = Vec::new();
@@ -46,41 +48,39 @@ impl ParticleSystem {
         // compute the squared distance between the two particles and compare it to the squared sum
         // of their radii. If they are colliding, we swap their velocities.
 
-        let (pa, pb) = (self.particles[a].pos(), self.particles[b].pos());
+        let pa = self.particles.position(a);
+        let pb = self.particles.position(b);
 
         let dx = pb.x - pa.x;
         let dy = pb.y - pa.y;
 
         let dist_sq = dx * dx + dy * dy;
-        let min_dist = self.particles[a].radius() + self.particles[b].radius();
+        let min_dist = self.particles.radius(a) + self.particles.radius(b);
 
         if dist_sq < min_dist * min_dist {
-            // Swap velocities.
-            let v1 = self.particles[a].vel();
-            let v2 = self.particles[b].vel();
-            self.particles[a].set_vel(v2);
-            self.particles[b].set_vel(v1);
+            let v1 = self.particles.velocity(a);
+            let v2 = self.particles.velocity(b);
+            self.particles.set_velocity(a, v2);
+            self.particles.set_velocity(b, v1);
         }
     }
 
     /// Updates all particles in the system. This includes updating their positions and handling
     /// collisions with the walls / other particles.
     pub fn update(&mut self) {
-        for p in self.particles.iter_mut() {
-            p.update();
-        }
+        self.particles.update();
 
         self.pairs.clear();
         self.grid.clear();
 
-        for (i, p) in self.particles.iter().enumerate() {
-            self.grid.add_particle(p.pos(), i);
+        for (i, pos) in self.particles.positions_iter().enumerate() {
+            self.grid.add_particle(*pos, i);
         }
 
         let occupied_coords: Vec<(i32, i32)> = self
             .particles
-            .iter()
-            .map(|p| self.grid.cell_coords(p.pos()))
+            .positions_iter()
+            .map(|p| self.grid.cell_coords(*p))
             .collect::<HashSet<_>>()
             .into_iter()
             .collect();
@@ -114,8 +114,6 @@ impl ParticleSystem {
 
     /// Draws all particles in the system to the screen.
     pub fn draw(&self) {
-        for p in self.particles.iter() {
-            p.draw();
-        }
+        self.particles.draw();
     }
 }
